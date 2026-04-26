@@ -82,7 +82,7 @@ leaveSchema.index({ leaveId: 1 });
 // Validate that fromDate is before toDate
 leaveSchema.pre('save', function(next) {
   if (this.fromDate >= this.toDate) {
-    next(new Error('From date must be before to date'));
+    return next(new Error('From date must be before to date'));
   }
   next();
 });

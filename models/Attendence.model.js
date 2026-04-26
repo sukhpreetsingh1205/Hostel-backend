@@ -101,12 +101,19 @@ attendanceSchema.statics.getStudentAttendanceSummary = async function(studentId,
 
 // Static method to get daily summary
 attendanceSchema.statics.getDailySummary = async function(date) {
+
+   const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+
   const summary = await this.aggregate([
     {
       $match: {
         date: {
-          $gte: new Date(date.setHours(0, 0, 0)),
-          $lte: new Date(date.setHours(23, 59, 59))
+           $gte: start,
+           $lte: end
         }
       }
     },

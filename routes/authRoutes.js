@@ -43,7 +43,7 @@ router.post('/register', registerValidation, register);
 router.post('/login', authLimiter, loginValidation, login);
 router.post('/forgotpassword', forgotPassword);
 // Support both param names (older docs/frontend may use :token)
-router.put('/resetpassword/:token', resetPassword);
+// router.put('/resetpassword/:token', resetPassword);
 router.put('/resetpassword/:resettoken', resetPassword);
 router.post('/refreshtoken', refreshToken);
 

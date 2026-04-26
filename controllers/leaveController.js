@@ -4,6 +4,7 @@ import { AppError, ErrorTypes } from '../utils/AppError.js';
 import catchAsync from '../utils/catchAsync.js';
 import APIFeatures from '../utils/apiFeatures.js';
 import { sendEmail } from '../services/emailService.js';
+import { User } from '../models/User.model.js';
 
 // @desc    Get all leaves
 // @route   GET /api/v1/leaves

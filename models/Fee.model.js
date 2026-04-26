@@ -44,10 +44,9 @@ const feeSchema = new mongoose.Schema({
     min: 0
   },
   balance: {
-    type: Number,
-    default: function() {
-      return this.totalAmount - this.paidAmount;
-    }
+  type: Number,
+  default: 0,
+  min: 0
   },
   status: {
     type: String,

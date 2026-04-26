@@ -177,7 +177,7 @@ const vacateRoom = catchAsync(async (req, res) => {
 const getAvailableRooms = catchAsync(async (req, res) => {
   const rooms = await Room.find({
     status: 'available',
-    currentOccupancy: { $lt: '$capacity' }
+    
   }).sort({ block: 1, floor: 1, roomNumber: 1 });
   
   const availableRooms = rooms.filter(room => room.hasAvailableBeds());

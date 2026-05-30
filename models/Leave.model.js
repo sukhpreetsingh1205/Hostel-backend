@@ -77,7 +77,6 @@ const leaveSchema = new mongoose.Schema({
 // Indexes
 leaveSchema.index({ studentId: 1, status: 1 });
 leaveSchema.index({ fromDate: 1, toDate: 1 });
-leaveSchema.index({ leaveId: 1 });
 
 // Validate that fromDate is before toDate
 leaveSchema.pre('save', function(next) {

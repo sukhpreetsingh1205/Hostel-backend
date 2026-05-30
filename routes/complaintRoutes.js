@@ -5,6 +5,7 @@ import {
   getComplaint,
   createComplaint,
   updateComplaint,
+  updateComplaintStatus,
   assignComplaint,
   resolveComplaint,
   closeComplaint,
@@ -28,6 +29,7 @@ router.use(restrictTo('admin', 'warden'));
 router.get('/', getAllComplaints);
 router.get('/stats', restrictTo('admin'), getComplaintStats);
 router.get('/:id', getComplaint);
+router.put('/:id/status', updateComplaintStatus);
 router.put('/:id/assign', restrictTo('admin'), assignComplaint);
 router.put('/:id/resolve', resolveComplaint);
 router.post('/:id/comments', addComment);

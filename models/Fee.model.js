@@ -107,7 +107,6 @@ const feeSchema = new mongoose.Schema({
 // Indexes
 feeSchema.index({ studentId: 1, month: 1, year: 1 }, { unique: true });
 feeSchema.index({ status: 1, dueDate: 1 });
-feeSchema.index({ 'payments.transactionId': 1 });
 
 // Calculate balance before saving
 feeSchema.pre('save', function(next) {

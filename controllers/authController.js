@@ -11,7 +11,7 @@ import crypto from 'crypto';
 // @access  Private/Admin
 const register = catchAsync(async (req, res) => {
   const { name, email, password, role, phone } = req.body;
-  
+  console.log('Registering user with data:', { name, email, role, phone }); // Debug log
   // Check if user exists
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -29,8 +29,39 @@ const register = catchAsync(async (req, res) => {
   
   // If student, create student profile
   if (user.role === 'student') {
-    const { studentId, rollNumber, course, year, branch, parentName, parentPhone, address } = req.body;
-    
+    const {
+      studentId,
+      rollNumber,
+      course,
+      year,
+      branch,
+      semester,
+      dob,
+      parentName,
+      parentPhone,
+      address,
+    } = req.body;
+
+    const hasAllStudentFields = Boolean(
+      studentId &&
+        rollNumber &&
+        course &&
+        year &&
+        branch &&
+        semester &&
+        dob &&
+        parentName &&
+        parentPhone &&
+        address
+    );
+
+    if (!hasAllStudentFields) {
+      throw new AppError(
+        'Student profile details are required (studentId, rollNumber, course, year, branch, semester, dob, parentName, parentPhone, address).',
+        ErrorTypes.BAD_REQUEST
+      );
+    }
+
     await Student.create({
       userId: user._id,
       studentId,
@@ -38,6 +69,8 @@ const register = catchAsync(async (req, res) => {
       course,
       year,
       branch,
+      semester,
+      dob,
       parentName,
       parentPhone,
       address,

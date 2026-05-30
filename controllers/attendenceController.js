@@ -5,6 +5,34 @@ import { AppError, ErrorTypes } from '../utils/AppError.js';
 import catchAsync from '../utils/catchAsync.js';
 import APIFeatures from '../utils/apiFeatures.js';
 
+const parseDateOnly = (value) => {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+      if (Number.isNaN(date.getTime())) return null;
+      return date;
+    }
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
 // @desc    Get all attendance records
 // @route   GET /api/v1/attendance
 // @access  Private/Admin,Warden
@@ -68,16 +96,12 @@ const getStudentAttendance = catchAsync(async (req, res) => {
 // @access  Private/Admin,Warden
 const getAttendanceByDate = catchAsync(async (req, res) => {
   const { date } = req.params;
-  const targetDate = new Date(date);
-  
-  if (Number.isNaN(targetDate.getTime())) {
+  const startOfDay = parseDateOnly(date);
+  if (!startOfDay) {
     throw new AppError('Invalid date format', ErrorTypes.BAD_REQUEST);
   }
 
-  const startOfDay = new Date(targetDate);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(targetDate);
+  const endOfDay = new Date(startOfDay);
   endOfDay.setHours(23, 59, 59, 999);
 
   const attendance = await Attendance.find({
@@ -104,12 +128,10 @@ const markAttendance = catchAsync(async (req, res) => {
   const { date, records } = req.body;
   const markedBy = req.user.id;
   
-  const targetDate = new Date(date);
-  if (Number.isNaN(targetDate.getTime())) {
+  const targetDate = parseDateOnly(date);
+  if (!targetDate) {
     throw new AppError('Invalid date format', ErrorTypes.BAD_REQUEST);
   }
-
-  targetDate.setHours(0, 0, 0, 0);
   
   const results = {
     success: [],
@@ -292,9 +314,13 @@ const getAttendanceStats = catchAsync(async (req, res) => {
     { $sort: { percentage: 1 } },
   ]);
   
+  const averageAttendanceValue = stats.length
+    ? stats.reduce((sum, s) => sum + (Number(s.percentage) || 0), 0) / stats.length
+    : 0;
+
   const summary = {
     totalStudents: stats.length,
-    averageAttendance: (stats.reduce((sum, s) => sum + s.percentage, 0) / stats.length).toFixed(2),
+    averageAttendance: averageAttendanceValue.toFixed(2),
     studentsBelow75: stats.filter(s => s.percentage < 75).length,
   };
   

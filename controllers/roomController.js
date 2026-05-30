@@ -3,6 +3,38 @@ import Student from '../models/Student.js';
 import { AppError, ErrorTypes } from '../utils/AppError.js';
 import catchAsync from '../utils/catchAsync.js';
 import APIFeatures from '../utils/apiFeatures.js';
+import { sendEmail } from '../services/emailService.js';
+
+const getStudentName = (student) => student.userId?.name || student.fullName || 'Student';
+const getStudentEmail = (student) => student.userId?.email || student.email;
+const getId = (value) => value?._id?.toString() || value?.toString() || null;
+
+const sendRoomAllotmentEmail = async (student, room) => {
+  const to = getStudentEmail(student);
+  if (!to) return;
+
+  try {
+    await sendEmail({
+      to,
+      subject: `Room ${room.roomNumber} allotted`,
+      html: `
+        <h2>Room Allotment Confirmation</h2>
+        <p>Hello ${getStudentName(student)},</p>
+        <p>Your hostel room has been allotted successfully.</p>
+        <table cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
+          <tr><td><strong>Room</strong></td><td>${room.roomNumber}</td></tr>
+          <tr><td><strong>Block</strong></td><td>${room.block}</td></tr>
+          <tr><td><strong>Floor</strong></td><td>${room.floor}</td></tr>
+          <tr><td><strong>Type</strong></td><td>${room.type}</td></tr>
+        </table>
+        <p>Please contact the hostel office if any detail looks incorrect.</p>
+      `,
+      text: `Hello ${getStudentName(student)}, your hostel room has been allotted. Room: ${room.roomNumber}, Block: ${room.block}, Floor: ${room.floor}, Type: ${room.type}.`,
+    });
+  } catch (error) {
+    console.error('Failed to send room allotment email:', error.message);
+  }
+};
 
 // @desc    Get all rooms
 // @route   GET /api/v1/rooms
@@ -29,7 +61,11 @@ const getAllRooms = catchAsync(async (req, res) => {
 // @access  Private/Admin,Warden,Student
 const getRoom = catchAsync(async (req, res) => {
   const room = await Room.findById(req.params.id)
-    .populate('currentStudents', 'studentId name rollNumber course year');
+    .populate({
+      path: 'currentStudents',
+      select: 'studentId rollNumber course year userId',
+      populate: { path: 'userId', select: 'name email phone' },
+    });
   
   if (!room) {
     throw new AppError('Room not found', ErrorTypes.NOT_FOUND);
@@ -131,6 +167,7 @@ const allotRoom = catchAsync(async (req, res) => {
   await room.allotRoom(studentId);
   student.roomId = roomId;
   await student.save();
+  await sendRoomAllotmentEmail(student, room);
   
   res.json({
     success: true,
@@ -155,7 +192,7 @@ const vacateRoom = catchAsync(async (req, res) => {
     throw new AppError('Student not found', ErrorTypes.NOT_FOUND);
   }
   
-  if (!student.roomId || student.roomId.toString() !== roomId) {
+  if (!student.roomId || getId(student.roomId) !== roomId) {
     throw new AppError('Student is not allotted to this room', ErrorTypes.BAD_REQUEST);
   }
   

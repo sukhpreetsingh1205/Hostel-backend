@@ -6,11 +6,51 @@ import catchAsync from '../utils/catchAsync.js';
 import APIFeatures from '../utils/apiFeatures.js';
 import { sendEmail } from '../services/emailService.js';
 
+const complaintStatuses = ['pending', 'in-progress', 'resolved', 'rejected', 'closed'];
+
+const getStudentEmail = (student) => student?.userId?.email || student?.email;
+const getStudentName = (student) => student?.userId?.name || student?.name || 'Student';
+
+const sendComplaintStatusEmail = async (complaint, previousStatus, remarks) => {
+  const to = getStudentEmail(complaint.studentId);
+  if (!to) return;
+
+  try {
+    await sendEmail({
+      to,
+      subject: `Complaint Status Updated - ${complaint.complaintId}`,
+      html: `
+        <h2>Complaint Status Updated</h2>
+        <p>Dear ${getStudentName(complaint.studentId)},</p>
+        <p>Your complaint status has been updated.</p>
+        <table cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
+          <tr><td><strong>Complaint ID</strong></td><td>${complaint.complaintId}</td></tr>
+          <tr><td><strong>Title</strong></td><td>${complaint.title}</td></tr>
+          <tr><td><strong>Previous Status</strong></td><td>${previousStatus}</td></tr>
+          <tr><td><strong>New Status</strong></td><td>${complaint.status}</td></tr>
+        </table>
+        ${remarks ? `<p><strong>Remarks:</strong> ${remarks}</p>` : ''}
+        <p>Please login to your hostel portal for more details.</p>
+      `,
+      text: `Dear ${getStudentName(complaint.studentId)}, your complaint ${complaint.complaintId} status changed from ${previousStatus} to ${complaint.status}.${remarks ? ` Remarks: ${remarks}` : ''}`,
+    });
+  } catch (error) {
+    console.error('Failed to send complaint status email:', error.message);
+  }
+};
+
 // @desc    Get all complaints
 // @route   GET /api/v1/complaints
 // @access  Private/Admin,Warden
 const getAllComplaints = catchAsync(async (req, res) => {
-  const features = new APIFeatures(Complaint.find().populate('studentId', 'studentId name rollNumber'), req.query)
+  const features = new APIFeatures(Complaint.find().populate({
+    path: 'studentId',
+    select: 'studentId rollNumber roomId userId',
+    populate: [
+      { path: 'userId', select: 'name email phone' },
+      { path: 'roomId', select: 'roomNumber block' },
+    ],
+  }), req.query)
     .filter()
     .sort()
     .limitFields()
@@ -64,7 +104,14 @@ const getStudentComplaints = catchAsync(async (req, res) => {
 // @access  Private/Admin,Warden,Student
 const getComplaint = catchAsync(async (req, res) => {
   const complaint = await Complaint.findById(req.params.id)
-    .populate('studentId', 'studentId name rollNumber roomId phone email')
+    .populate({
+      path: 'studentId',
+      select: 'studentId rollNumber roomId userId',
+      populate: [
+        { path: 'userId', select: 'name email phone' },
+        { path: 'roomId', select: 'roomNumber block' },
+      ],
+    })
     .populate('assignedTo', 'name email role')
     .populate('resolution.resolvedBy', 'name')
     .populate('comments.commentedBy', 'name role');
@@ -83,6 +130,69 @@ const getComplaint = catchAsync(async (req, res) => {
   
   res.json({
     success: true,
+    data: complaint,
+  });
+});
+
+// @desc    Update complaint status
+// @route   PUT /api/v1/complaints/:id/status
+// @access  Private/Admin,Warden
+const updateComplaintStatus = catchAsync(async (req, res) => {
+  const { status, remarks } = req.body;
+
+  if (!complaintStatuses.includes(status)) {
+    throw new AppError('Invalid complaint status', ErrorTypes.BAD_REQUEST);
+  }
+
+  const complaint = await Complaint.findById(req.params.id).populate({
+    path: 'studentId',
+    select: 'studentId rollNumber roomId userId',
+    populate: [
+      { path: 'userId', select: 'name email phone' },
+      { path: 'roomId', select: 'roomNumber block' },
+    ],
+  });
+
+  if (!complaint) {
+    throw new AppError('Complaint not found', ErrorTypes.NOT_FOUND);
+  }
+
+  const previousStatus = complaint.status;
+  if (previousStatus === status) {
+    return res.json({
+      success: true,
+      message: 'Complaint status is already up to date',
+      data: complaint,
+    });
+  }
+
+  complaint.status = status;
+
+  if (status === 'resolved') {
+    complaint.resolution = {
+      ...(complaint.resolution || {}),
+      description: remarks || complaint.resolution?.description || 'Resolved by admin',
+      resolvedBy: req.user.id,
+      resolvedAt: new Date(),
+      cost: complaint.resolution?.cost || 0,
+    };
+  }
+
+  if (remarks) {
+    complaint.comments.push({
+      comment: remarks,
+      commentedBy: req.user.id,
+      isStaff: true,
+      commentedAt: new Date(),
+    });
+  }
+
+  await complaint.save();
+  await sendComplaintStatusEmail(complaint, previousStatus, remarks);
+
+  res.json({
+    success: true,
+    message: 'Complaint status updated successfully',
     data: complaint,
   });
 });
@@ -359,6 +469,7 @@ export {
   getComplaint,
   createComplaint,
   updateComplaint,
+  updateComplaintStatus,
   assignComplaint,
   resolveComplaint,
   closeComplaint,

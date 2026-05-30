@@ -6,6 +6,7 @@ import {
   updateStudent,
   deleteStudent,
   getStudentStats,
+  getStudentsWithoutRoom,
 } from '../controllers/studentController.js';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
 
@@ -15,6 +16,7 @@ router.use(protect);
 
 router.get('/', restrictTo('admin', 'warden'), getAllStudents);
 router.get('/stats/dashboard', restrictTo('admin'), getStudentStats);
+router.get('/without-room', restrictTo('admin', 'warden'), getStudentsWithoutRoom);
 router.get('/:id', restrictTo('admin', 'warden', 'student'), getStudent);
 
 router.use(restrictTo('admin'));

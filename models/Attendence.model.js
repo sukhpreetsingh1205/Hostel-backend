@@ -101,30 +101,56 @@ attendanceSchema.statics.getStudentAttendanceSummary = async function(studentId,
 
 // Static method to get daily summary
 attendanceSchema.statics.getDailySummary = async function(date) {
+  const start = new Date(date);
+  if (Number.isNaN(start.getTime())) {
+    return {
+      present: 0,
+      absent: 0,
+      late: 0,
+      holiday: 0,
+      leave: 0,
+      total: 0,
+    };
+  }
 
-   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
 
-  const end = new Date(date);
+  const end = new Date(start);
   end.setHours(23, 59, 59, 999);
 
-  const summary = await this.aggregate([
+  const rows = await this.aggregate([
     {
       $match: {
         date: {
-           $gte: start,
-           $lte: end
-        }
-      }
+          $gte: start,
+          $lte: end,
+        },
+      },
     },
     {
       $group: {
         _id: '$status',
-        count: { $sum: 1 }
-      }
-    }
+        count: { $sum: 1 },
+      },
+    },
   ]);
-  return summary;
+
+  const summary = {
+    present: 0,
+    absent: 0,
+    late: 0,
+    holiday: 0,
+    leave: 0,
+  };
+
+  rows.forEach((row) => {
+    if (row?._id && Object.prototype.hasOwnProperty.call(summary, row._id)) {
+      summary[row._id] = row.count;
+    }
+  });
+
+  const total = Object.values(summary).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  return { ...summary, total };
 };
 
 export const Attendence = mongoose.model('Attendance', attendanceSchema);
